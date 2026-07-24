@@ -1,0 +1,60 @@
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@400;500;600;700&display=swap');
+@import 'tailwindcss';
+
+@theme {
+  --font-display: 'Bebas Neue', sans-serif;
+  --font-sans: 'Outfit', sans-serif;
+
+  --color-ink: #0a0c09;
+  --color-panel: #141812;
+  --color-panel-2: #1c2319;
+  --color-line: #2a3426;
+  --color-foam: #f3e6c8;
+  --color-amber: #f0a202;
+  --color-amber-hot: #ffc857;
+  --color-live: #5cff9d;
+  --color-danger: #ff5a5a;
+  --color-muted: #8b9784;
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    min-height: 100%;
+  }
+
+  body {
+    margin: 0;
+    font-family: var(--font-sans);
+    background:
+      radial-gradient(ellipse 90% 60% at 10% -10%, rgba(240, 162, 2, 0.18), transparent 55%),
+      radial-gradient(ellipse 70% 50% at 100% 0%, rgba(92, 255, 157, 0.08), transparent 50%),
+      linear-gradient(180deg, #10140e 0%, var(--color-ink) 45%, #0d120c 100%);
+    color: var(--color-foam);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
+}
+
+@layer utilities {
+  .font-display {
+    font-family: var(--font-display);
+    letter-spacing: 0.04em;
+  }
+
+  .tap-target {
+    min-height: 48px;
+    min-width: 48px;
+  }
+}
