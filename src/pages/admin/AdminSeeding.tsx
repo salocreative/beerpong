@@ -1,5 +1,23 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  SortableContext,
+  arrayMove,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { TeamAvatar } from '../../components/TeamAvatar'
 import { supabase } from '../../lib/supabase'
 import type { Event, Team } from '../../lib/types'
@@ -11,6 +29,87 @@ interface Props {
   onChanged: () => Promise<void>
 }
 
+function SortableTeamRow({
+  team,
+  index,
+  busy,
+  canDelete,
+  onDelete,
+  onMove,
+  isFirst,
+  isLast,
+}: {
+  team: Team
+  index: number
+  busy: boolean
+  canDelete: boolean
+  onDelete: () => void
+  onMove: (dir: -1 | 1) => void
+  isFirst: boolean
+  isLast: boolean
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: team.id })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  }
+
+  return (
+    <li
+      ref={setNodeRef}
+      style={style}
+      className={`flex flex-wrap items-center gap-3 rounded-2xl border bg-panel/80 px-3 py-3 ${
+        isDragging
+          ? 'z-10 border-amber shadow-lg shadow-amber/10'
+          : 'border-line'
+      }`}
+    >
+      <button
+        type="button"
+        className="tap-target cursor-grab touch-none rounded-lg border border-line px-3 text-muted active:cursor-grabbing"
+        aria-label={`Drag ${team.name}`}
+        {...attributes}
+        {...listeners}
+      >
+        ⠿
+      </button>
+      <span className="w-8 font-display text-2xl text-amber">{index + 1}</span>
+      <div className="min-w-0 flex-1">
+        <TeamAvatar team={team} size="sm" />
+        <p className="mt-1 pl-12 text-xs text-muted">{membersLabel(team.members)}</p>
+      </div>
+      <div className="flex gap-1">
+        <button
+          type="button"
+          className="tap-target rounded-lg border border-line px-3"
+          onClick={() => onMove(-1)}
+          disabled={isFirst}
+        >
+          ↑
+        </button>
+        <button
+          type="button"
+          className="tap-target rounded-lg border border-line px-3"
+          onClick={() => onMove(1)}
+          disabled={isLast}
+        >
+          ↓
+        </button>
+        <button
+          type="button"
+          className="tap-target rounded-lg border border-danger/40 px-3 text-danger"
+          onClick={onDelete}
+          disabled={busy || !canDelete}
+        >
+          Delete
+        </button>
+      </div>
+    </li>
+  )
+}
+
 export function AdminSeeding({ event, teams, onChanged }: Props) {
   const registered = teams.filter((t) => t.state === 'registered' || t.state === 'queued')
   const [order, setOrder] = useState<string[]>([])
@@ -19,6 +118,12 @@ export function AdminSeeding({ event, teams, onChanged }: Props) {
   const [showAdd, setShowAdd] = useState(false)
   const [name, setName] = useState('')
   const [members, setMembers] = useState(['', '', ''])
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  )
 
   useEffect(() => {
     setOrder((prev) => {
@@ -38,9 +143,18 @@ export function AdminSeeding({ event, teams, onChanged }: Props) {
       const i = prev.indexOf(id)
       const j = i + dir
       if (i < 0 || j < 0 || j >= prev.length) return prev
-      const next = [...prev]
-      ;[next[i], next[j]] = [next[j], next[i]]
-      return next
+      return arrayMove(prev, i, j)
+    })
+  }
+
+  function onDragEnd(event: DragEndEvent) {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    setOrder((prev) => {
+      const oldIndex = prev.indexOf(String(active.id))
+      const newIndex = prev.indexOf(String(over.id))
+      if (oldIndex < 0 || newIndex < 0) return prev
+      return arrayMove(prev, oldIndex, newIndex)
     })
   }
 
@@ -106,8 +220,8 @@ export function AdminSeeding({ event, teams, onChanged }: Props) {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-muted">
-          {registered.length} teams registered. Drag order via ↑↓ after the physical seeding game,
-          then start.
+          {registered.length} teams registered. Drag the ⠿ handle to set seeding order, then
+          start.
         </p>
         <div className="flex gap-2">
           <button
@@ -166,46 +280,25 @@ export function AdminSeeding({ event, teams, onChanged }: Props) {
 
       {error && <p className="text-danger">{error}</p>}
 
-      <ol className="space-y-2">
-        {orderedTeams.map((team, i) => (
-          <li
-            key={team.id}
-            className="flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-panel/80 px-3 py-3"
-          >
-            <span className="font-display text-2xl text-amber w-8">{i + 1}</span>
-            <div className="min-w-0 flex-1">
-              <TeamAvatar team={team} size="sm" />
-              <p className="mt-1 pl-12 text-xs text-muted">{membersLabel(team.members)}</p>
-            </div>
-            <div className="flex gap-1">
-              <button
-                type="button"
-                className="tap-target rounded-lg border border-line px-3"
-                onClick={() => move(team.id, -1)}
-                disabled={i === 0}
-              >
-                ↑
-              </button>
-              <button
-                type="button"
-                className="tap-target rounded-lg border border-line px-3"
-                onClick={() => move(team.id, 1)}
-                disabled={i === orderedTeams.length - 1}
-              >
-                ↓
-              </button>
-              <button
-                type="button"
-                className="tap-target rounded-lg border border-danger/40 px-3 text-danger"
-                onClick={() => void deleteTeam(team.id)}
-                disabled={busy || event.phase === 'live'}
-              >
-                Delete
-              </button>
-            </div>
-          </li>
-        ))}
-      </ol>
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+        <SortableContext items={order} strategy={verticalListSortingStrategy}>
+          <ol className="space-y-2">
+            {orderedTeams.map((team, i) => (
+              <SortableTeamRow
+                key={team.id}
+                team={team}
+                index={i}
+                busy={busy}
+                canDelete={event.phase !== 'live'}
+                onDelete={() => void deleteTeam(team.id)}
+                onMove={(dir) => move(team.id, dir)}
+                isFirst={i === 0}
+                isLast={i === orderedTeams.length - 1}
+              />
+            ))}
+          </ol>
+        </SortableContext>
+      </DndContext>
     </div>
   )
 }
