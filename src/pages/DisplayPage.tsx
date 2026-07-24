@@ -1,3 +1,4 @@
+import { QRCodeSVG } from 'qrcode.react'
 import type { EventTable, Match, Team } from '../lib/types'
 import { EventCountdown, MatchTimer } from '../components/MatchTimer'
 import { Leaderboard } from '../components/Leaderboard'
@@ -7,6 +8,7 @@ import { TeamAvatar } from '../components/TeamAvatar'
 import { useEventData } from '../hooks/useEventData'
 import { useResolvedEventId } from '../hooks/useResolvedEventId'
 import { isSupabaseConfigured } from '../lib/supabase'
+import { membersLabel } from '../lib/utils'
 
 function activeMatchForTable(
   table: EventTable,
@@ -31,6 +33,93 @@ function waitingWinner(table: EventTable, teams: Team[]): Team | null {
   return teams.find((t) => t.state === 'playing' && t.table_id === table.id) ?? null
 }
 
+function registerUrlFor(eventId: string) {
+  return `${window.location.origin}${import.meta.env.BASE_URL}#/register?event=${eventId}`
+}
+
+function LobbyDisplay({ eventName, eventId, teams }: {
+  eventName: string
+  eventId: string
+  teams: Team[]
+}) {
+  const url = registerUrlFor(eventId)
+  const sorted = [...teams].sort(
+    (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+  )
+
+  return (
+    <div className="min-h-dvh px-4 py-6 sm:px-10 sm:py-8">
+      <div className="mb-8 text-center lg:text-left">
+        <p className="text-sm uppercase tracking-[0.35em] text-muted">Scan to join</p>
+        <h1 className="font-display text-6xl text-amber-hot sm:text-8xl lg:text-9xl">
+          {eventName}
+        </h1>
+      </div>
+
+      <div className="grid items-start gap-10 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
+        <div className="flex flex-col items-center gap-6">
+          <div className="rounded-[2rem] bg-foam p-6 sm:p-10 shadow-[0_0_80px_rgba(240,162,2,0.15)]">
+            <QRCodeSVG
+              value={url}
+              size={420}
+              bgColor="#f3e6c8"
+              fgColor="#0a0c09"
+              level="M"
+              className="h-auto w-full max-w-[min(70vw,420px)]"
+            />
+          </div>
+          <p className="max-w-md text-center text-lg text-muted">
+            Point your camera at the code to register your team
+          </p>
+        </div>
+
+        <section>
+          <div className="mb-4 flex items-end justify-between gap-3">
+            <h2 className="font-display text-4xl text-foam sm:text-5xl">Teams</h2>
+            <span className="font-display text-3xl text-amber">{sorted.length}</span>
+          </div>
+
+          {sorted.length === 0 ? (
+            <p className="rounded-2xl border border-dashed border-line bg-panel/40 px-6 py-16 text-center text-xl text-muted">
+              Waiting for the first team…
+            </p>
+          ) : (
+            <ul className="grid max-h-[70vh] gap-3 overflow-y-auto pr-1 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+              {sorted.map((team, i) => (
+                <li
+                  key={team.id}
+                  className="flex items-center gap-3 rounded-2xl border border-line bg-panel/80 px-4 py-3"
+                >
+                  <span className="font-display text-2xl text-amber w-8">{i + 1}</span>
+                  {team.photo_url ? (
+                    <img
+                      src={team.photo_url}
+                      alt=""
+                      className="h-12 w-12 rounded-full object-cover ring-2 ring-amber/30"
+                    />
+                  ) : (
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-panel-2 font-display text-xl text-amber ring-2 ring-line">
+                      {team.name.charAt(0)}
+                    </div>
+                  )}
+                  <div className="min-w-0">
+                    <div className="truncate font-display text-2xl leading-none text-foam">
+                      {team.name}
+                    </div>
+                    <div className="mt-1 truncate text-sm text-muted">
+                      {membersLabel(team.members)}
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      </div>
+    </div>
+  )
+}
+
 export function DisplayPage() {
   const { eventId, loading: resolving } = useResolvedEventId()
   const { event, teams, tables, matches, loading, error } = useEventData(eventId)
@@ -43,6 +132,11 @@ export function DisplayPage() {
   if (!event) return <EmptyState message="No event yet — open #/admin to create one." />
 
   const isEnded = event.phase === 'ended'
+  const isLobby = event.phase === 'registration' || event.phase === 'seeding'
+
+  if (isLobby) {
+    return <LobbyDisplay eventName={event.name} eventId={event.id} teams={teams} />
+  }
 
   return (
     <div className="min-h-dvh px-4 py-5 sm:px-8 sm:py-6">

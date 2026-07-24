@@ -47,9 +47,11 @@ npm run dev
 
 ## Deploy (GitHub Pages)
 
-1. Repo Settings → Pages → Source: **GitHub Actions**.
-2. Add repository secrets: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`.
-3. Push to `main` (or run the Deploy workflow manually).
+1. Add repository secrets: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`.
+2. Push to `main` — the workflow builds and publishes the `gh-pages` branch.
+3. Repo Settings → Pages → **Deploy from a branch** → Branch: **`gh-pages`** / `/ (root)`.
+
+Site URL: `https://<user>.github.io/beerpong/`
 
 `vite.config.ts` sets `base: '/beerpong/'`. Change that if the repo name differs.
 
