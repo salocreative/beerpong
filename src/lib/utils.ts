@@ -34,6 +34,15 @@ export function queueTeams(teams: Team[]): Team[] {
     .sort((a, b) => (a.queue_sequence ?? 0) - (b.queue_sequence ?? 0))
 }
 
+export function activeTables<T extends { table_number: number }>(
+  tables: T[],
+  tableCount: number,
+): T[] {
+  return tables
+    .filter((t) => t.table_number <= tableCount)
+    .sort((a, b) => a.table_number - b.table_number)
+}
+
 export function estimatedCans(gamesPlayed: number): number {
   return gamesPlayed * 2
 }

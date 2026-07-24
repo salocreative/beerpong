@@ -9,6 +9,7 @@ import { useEventData } from '../hooks/useEventData'
 import { useResolvedEventId } from '../hooks/useResolvedEventId'
 import { isSupabaseConfigured } from '../lib/supabase'
 import type { Match, Team } from '../lib/types'
+import { activeTables } from '../lib/utils'
 
 type Tab = 'leaderboard' | 'queue' | 'rules'
 
@@ -24,7 +25,7 @@ export function StatusPage() {
   if (error) return <EmptyState message={error} />
   if (!event) return <EmptyState message="No event yet." />
 
-  const nowPlaying = tables
+  const nowPlaying = activeTables(tables, event.table_count)
     .map((table) => {
       const match =
         matches.find((m) => m.id === table.current_match_id && !m.ended_at) ??

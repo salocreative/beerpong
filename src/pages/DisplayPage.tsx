@@ -8,7 +8,7 @@ import { TeamAvatar } from '../components/TeamAvatar'
 import { useEventData } from '../hooks/useEventData'
 import { useResolvedEventId } from '../hooks/useResolvedEventId'
 import { isSupabaseConfigured } from '../lib/supabase'
-import { membersLabel } from '../lib/utils'
+import { activeTables, membersLabel } from '../lib/utils'
 
 function activeMatchForTable(
   table: EventTable,
@@ -133,6 +133,7 @@ export function DisplayPage() {
 
   const isEnded = event.phase === 'ended'
   const isLobby = event.phase === 'registration' || event.phase === 'seeding'
+  const displayTables = activeTables(tables, event.table_count)
 
   if (isLobby) {
     return <LobbyDisplay eventName={event.name} eventId={event.id} teams={teams} />
@@ -161,12 +162,12 @@ export function DisplayPage() {
           <section>
             <h2 className="mb-4 font-display text-3xl text-foam">Now playing</h2>
             <div className="grid gap-4 lg:grid-cols-3">
-              {tables.length === 0 ? (
+              {displayTables.length === 0 ? (
                 <p className="text-muted col-span-full">
                   Tables appear when the tournament starts.
                 </p>
               ) : (
-                tables.map((table) => {
+                displayTables.map((table) => {
                   const active = activeMatchForTable(table, matches, teams)
                   const waiting = !active ? waitingWinner(table, teams) : null
 

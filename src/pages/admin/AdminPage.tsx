@@ -195,7 +195,7 @@ export function AdminPage() {
         <AdminTeams event={event} teams={data.teams} onChanged={data.refresh} />
       )}
       {tab === 'settings' && (
-        <AdminSettings event={event} onChanged={data.refresh} />
+        <AdminSettings event={event} tables={data.tables} onChanged={data.refresh} />
       )}
     </PageShell>
   )

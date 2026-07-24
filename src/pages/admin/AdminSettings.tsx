@@ -1,17 +1,19 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { supabase } from '../../lib/supabase'
-import type { Event } from '../../lib/types'
+import type { Event, EventTable } from '../../lib/types'
 import { fromLocalInputValue, toLocalInputValue } from '../../lib/utils'
 
 interface Props {
   event: Event
+  tables: EventTable[]
   onChanged: () => Promise<void>
 }
 
-export function AdminSettings({ event, onChanged }: Props) {
+export function AdminSettings({ event, tables, onChanged }: Props) {
   const [timerEnabled, setTimerEnabled] = useState(event.timer_enabled)
   const [duration, setDuration] = useState(event.timer_duration_seconds)
+  const [tableCount, setTableCount] = useState(event.table_count)
   const [startsAt, setStartsAt] = useState(toLocalInputValue(event.starts_at))
   const [endsAt, setEndsAt] = useState(toLocalInputValue(event.ends_at))
   const [name, setName] = useState(event.name)
@@ -22,6 +24,7 @@ export function AdminSettings({ event, onChanged }: Props) {
   useEffect(() => {
     setTimerEnabled(event.timer_enabled)
     setDuration(event.timer_duration_seconds)
+    setTableCount(event.table_count)
     setStartsAt(toLocalInputValue(event.starts_at))
     setEndsAt(toLocalInputValue(event.ends_at))
     setName(event.name)
@@ -32,22 +35,66 @@ export function AdminSettings({ event, onChanged }: Props) {
     setBusy(true)
     setError(null)
     setMessage(null)
+
+    const count = Math.max(1, Math.min(10, Math.floor(tableCount) || 1))
+
+    if (count < event.table_count) {
+      const busyHigher = tables.filter(
+        (t) => t.table_number > count && t.current_match_id !== null,
+      )
+      if (busyHigher.length > 0) {
+        setBusy(false)
+        setError(
+          `Can't reduce to ${count} tables while table ${busyHigher
+            .map((t) => t.table_number)
+            .join(', ')} still has an active match.`,
+        )
+        return
+      }
+    }
+
     const { error: updateError } = await supabase
       .from('events')
       .update({
         name: name.trim(),
         timer_enabled: timerEnabled,
         timer_duration_seconds: Math.max(30, duration),
+        table_count: count,
         starts_at: fromLocalInputValue(startsAt),
         ends_at: fromLocalInputValue(endsAt),
       })
       .eq('id', event.id)
-    setBusy(false)
+
     if (updateError) {
+      setBusy(false)
       setError(updateError.message)
       return
     }
-    setMessage('Saved. New matches will use the updated timer settings.')
+
+    // Ensure event_tables rows exist for 1..count
+    const existing = new Set(tables.map((t) => t.table_number))
+    const missing = []
+    for (let n = 1; n <= count; n++) {
+      if (!existing.has(n)) {
+        missing.push({ event_id: event.id, table_number: n })
+      }
+    }
+    if (missing.length > 0) {
+      const { error: insertError } = await supabase.from('event_tables').insert(missing)
+      if (insertError) {
+        setBusy(false)
+        setError(insertError.message)
+        return
+      }
+    }
+
+    setBusy(false)
+    setTableCount(count)
+    setMessage(
+      count !== event.table_count
+        ? `Saved. Now using ${count} table${count === 1 ? '' : 's'}.`
+        : 'Saved. New matches will use the updated timer settings.',
+    )
     await onChanged()
   }
 
@@ -122,6 +169,24 @@ export function AdminSettings({ event, onChanged }: Props) {
           value={name}
           onChange={(e) => setName(e.target.value)}
         />
+      </label>
+
+      <label className="block">
+        <span className="mb-2 block text-xs uppercase tracking-[0.15em] text-muted">
+          Number of tables
+        </span>
+        <input
+          type="number"
+          min={1}
+          max={10}
+          className="tap-target w-full rounded-xl border border-line bg-panel px-4 py-3 outline-none focus:border-amber"
+          value={tableCount}
+          onChange={(e) => setTableCount(Number(e.target.value))}
+        />
+        <span className="mt-1 block text-sm text-muted">
+          1–10. Adds tables immediately; reducing hides higher tables (blocked if they have an
+          active match).
+        </span>
       </label>
 
       <label className="flex items-center justify-between gap-4 rounded-2xl border border-line bg-panel px-4 py-4">
