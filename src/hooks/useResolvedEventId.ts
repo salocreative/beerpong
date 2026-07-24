@@ -5,20 +5,29 @@ import { resolveActiveEventId } from './useEventData'
 export function useResolvedEventId(): {
   eventId: string | null
   loading: boolean
+  error: string | null
 } {
   const [params] = useSearchParams()
   const preferred = params.get('event')
   const [eventId, setEventId] = useState<string | null>(preferred)
   const [loading, setLoading] = useState(!preferred)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
     void (async () => {
       setLoading(true)
-      const id = await resolveActiveEventId(preferred)
-      if (!cancelled) {
-        setEventId(id)
-        setLoading(false)
+      setError(null)
+      try {
+        const id = await resolveActiveEventId(preferred)
+        if (!cancelled) setEventId(id)
+      } catch (err) {
+        if (!cancelled) {
+          setEventId(preferred)
+          setError(err instanceof Error ? err.message : 'Failed to resolve event')
+        }
+      } finally {
+        if (!cancelled) setLoading(false)
       }
     })()
     return () => {
@@ -26,5 +35,5 @@ export function useResolvedEventId(): {
     }
   }, [preferred])
 
-  return { eventId, loading }
+  return { eventId, loading, error }
 }

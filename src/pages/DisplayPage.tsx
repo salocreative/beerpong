@@ -121,14 +121,14 @@ function LobbyDisplay({ eventName, eventId, teams }: {
 }
 
 export function DisplayPage() {
-  const { eventId, loading: resolving } = useResolvedEventId()
+  const { eventId, loading: resolving, error: resolveError } = useResolvedEventId()
   const { event, teams, tables, matches, loading, error } = useEventData(eventId)
 
   if (!isSupabaseConfigured()) {
     return <EmptyState message="Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to .env" />
   }
   if (resolving || loading) return <LoadingState />
-  if (error) return <EmptyState message={error} />
+  if (resolveError || error) return <EmptyState message={resolveError ?? error ?? 'Error'} />
   if (!event) return <EmptyState message="No event yet — open #/admin to create one." />
 
   const isEnded = event.phase === 'ended'

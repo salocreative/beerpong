@@ -50,6 +50,7 @@ export async function resolveActiveEventId(
     .limit(1)
     .maybeSingle()
 
+  if (live.error) throw live.error
   if (live.data?.id) return live.data.id
 
   const latest = await supabase
@@ -59,6 +60,7 @@ export async function resolveActiveEventId(
     .limit(1)
     .maybeSingle()
 
+  if (latest.error) throw latest.error
   return latest.data?.id ?? null
 }
 
