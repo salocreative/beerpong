@@ -19,11 +19,13 @@ export function formatClock(totalSeconds: number): string {
 }
 
 export function rankTeams(teams: Team[]): Team[] {
-  return [...teams].sort((a, b) => {
-    if (b.wins !== a.wins) return b.wins - a.wins
-    if (a.losses !== b.losses) return a.losses - b.losses
-    return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-  })
+  return [...teams]
+    .filter((t) => t.state !== 'withdrawn' || t.games_played > 0)
+    .sort((a, b) => {
+      if (b.wins !== a.wins) return b.wins - a.wins
+      if (a.losses !== b.losses) return a.losses - b.losses
+      return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    })
 }
 
 export function queueTeams(teams: Team[]): Team[] {

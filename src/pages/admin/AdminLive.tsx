@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import type { FormEvent } from 'react'
 import { MatchTimer } from '../../components/MatchTimer'
 import { QueueList } from '../../components/QueueList'
 import { TeamAvatar } from '../../components/TeamAvatar'
@@ -15,7 +16,11 @@ interface Props {
 
 export function AdminLive({ event, teams, tables, matches, onChanged }: Props) {
   const [busyMatch, setBusyMatch] = useState<string | null>(null)
+  const [busyQueue, setBusyQueue] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [showLate, setShowLate] = useState(false)
+  const [lateName, setLateName] = useState('')
+  const [lateMembers, setLateMembers] = useState(['', '', ''])
 
   async function declareWinner(matchId: string, winnerId: string, teamName: string) {
     if (!confirm(`Confirm winner: ${teamName}?`)) return
@@ -30,6 +35,61 @@ export function AdminLive({ event, teams, tables, matches, onChanged }: Props) {
       setError(rpcError.message)
       return
     }
+    await onChanged()
+  }
+
+  async function skipTeam(team: Team) {
+    if (!confirm(`Skip ${team.name}? They go to the back of the queue.`)) return
+    setBusyQueue(true)
+    setError(null)
+    const { error: rpcError } = await supabase.rpc('skip_queue_team', {
+      p_team_id: team.id,
+    })
+    setBusyQueue(false)
+    if (rpcError) {
+      setError(rpcError.message)
+      return
+    }
+    await onChanged()
+  }
+
+  async function withdrawTeam(team: Team) {
+    if (!confirm(`Mark ${team.name} as left? They leave the rotation.`)) return
+    setBusyQueue(true)
+    setError(null)
+    const { error: rpcError } = await supabase.rpc('withdraw_team', {
+      p_team_id: team.id,
+    })
+    setBusyQueue(false)
+    if (rpcError) {
+      setError(rpcError.message)
+      return
+    }
+    await onChanged()
+  }
+
+  async function addLateTeam(e: FormEvent) {
+    e.preventDefault()
+    const clean = lateMembers.map((m) => m.trim()).filter(Boolean)
+    if (!lateName.trim() || clean.length < 2) {
+      setError('Late team needs a name + 2–3 members.')
+      return
+    }
+    setBusyQueue(true)
+    setError(null)
+    const { error: rpcError } = await supabase.rpc('add_late_team', {
+      p_event_id: event.id,
+      p_name: lateName.trim(),
+      p_members: clean,
+    })
+    setBusyQueue(false)
+    if (rpcError) {
+      setError(rpcError.message)
+      return
+    }
+    setLateName('')
+    setLateMembers(['', '', ''])
+    setShowLate(false)
     await onChanged()
   }
 
@@ -57,7 +117,7 @@ export function AdminLive({ event, teams, tables, matches, onChanged }: Props) {
 
           return (
             <div key={table.id} className="rounded-2xl border border-line bg-panel p-4">
-              <div className="mb-4 flex items-center justify-between">
+              <div className="mb-4 flex items-center justify-between gap-2">
                 <h3 className="font-display text-3xl text-amber">Table {table.table_number}</h3>
                 {match?.timer_enabled && (
                   <MatchTimer
@@ -71,22 +131,54 @@ export function AdminLive({ event, teams, tables, matches, onChanged }: Props) {
               </div>
 
               {match && teamA && teamB ? (
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <WinnerButton
-                    team={teamA}
-                    disabled={busyMatch === match.id || event.phase === 'ended'}
-                    onClick={() => void declareWinner(match.id, teamA.id, teamA.name)}
-                  />
-                  <WinnerButton
-                    team={teamB}
-                    disabled={busyMatch === match.id || event.phase === 'ended'}
-                    onClick={() => void declareWinner(match.id, teamB.id, teamB.name)}
-                  />
+                <div className="space-y-3">
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <WinnerButton
+                      team={teamA}
+                      disabled={busyMatch === match.id || event.phase === 'ended'}
+                      onClick={() => void declareWinner(match.id, teamA.id, teamA.name)}
+                    />
+                    <WinnerButton
+                      team={teamB}
+                      disabled={busyMatch === match.id || event.phase === 'ended'}
+                      onClick={() => void declareWinner(match.id, teamB.id, teamB.name)}
+                    />
+                  </div>
+                  {event.phase === 'live' && (
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        disabled={busyQueue}
+                        onClick={() => void withdrawTeam(teamA)}
+                        className="tap-target rounded-lg border border-danger/40 px-3 py-2 text-sm text-danger"
+                      >
+                        {teamA.name} leaves
+                      </button>
+                      <button
+                        type="button"
+                        disabled={busyQueue}
+                        onClick={() => void withdrawTeam(teamB)}
+                        className="tap-target rounded-lg border border-danger/40 px-3 py-2 text-sm text-danger"
+                      >
+                        {teamB.name} leaves
+                      </button>
+                    </div>
+                  )}
                 </div>
               ) : waiting ? (
-                <div className="rounded-xl border border-dashed border-live/40 bg-live/5 p-4 text-center">
+                <div className="space-y-3 rounded-xl border border-dashed border-live/40 bg-live/5 p-4 text-center">
                   <TeamAvatar team={waiting} className="justify-center" />
-                  <p className="mt-3 text-live">Waiting for next team</p>
+                  <p className="text-live">Waiting for next team</p>
+                  {event.phase === 'live' && (
+                    <button
+                      type="button"
+                      disabled={busyQueue}
+                      onClick={() => void withdrawTeam(waiting)}
+                      className="tap-target rounded-lg border border-danger/40 px-3 py-2 text-sm text-danger"
+                    >
+                      {waiting.name} leaves
+                    </button>
+                  )}
                 </div>
               ) : (
                 <p className="py-6 text-center text-muted">No active match</p>
@@ -96,9 +188,63 @@ export function AdminLive({ event, teams, tables, matches, onChanged }: Props) {
         })}
       </div>
 
-      <aside>
-        <h3 className="mb-3 font-display text-2xl text-foam">Queue</h3>
-        <QueueList teams={teams} />
+      <aside className="space-y-4">
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="font-display text-2xl text-foam">Queue</h3>
+          {event.phase === 'live' && (
+            <button
+              type="button"
+              onClick={() => setShowLate((v) => !v)}
+              className="tap-target rounded-xl border border-line px-3 py-2 text-sm"
+            >
+              {showLate ? 'Cancel' : 'Add late team'}
+            </button>
+          )}
+        </div>
+
+        {showLate && (
+          <form
+            onSubmit={addLateTeam}
+            className="space-y-2 rounded-2xl border border-amber/40 bg-panel p-3"
+          >
+            <p className="text-xs text-muted">Goes to the back of the queue (or fills a waiting table).</p>
+            <input
+              className="tap-target w-full rounded-xl border border-line bg-ink px-3 py-2"
+              placeholder="Team name"
+              value={lateName}
+              onChange={(e) => setLateName(e.target.value)}
+              required
+            />
+            {lateMembers.map((m, i) => (
+              <input
+                key={i}
+                className="tap-target w-full rounded-xl border border-line bg-ink px-3 py-2"
+                placeholder={`Member ${i + 1}${i < 2 ? '' : ' (optional)'}`}
+                value={m}
+                onChange={(e) => {
+                  const next = [...lateMembers]
+                  next[i] = e.target.value
+                  setLateMembers(next)
+                }}
+                required={i < 2}
+              />
+            ))}
+            <button
+              type="submit"
+              disabled={busyQueue}
+              className="tap-target w-full rounded-xl bg-amber px-3 py-2 font-semibold text-ink"
+            >
+              Add to queue
+            </button>
+          </form>
+        )}
+
+        <QueueList
+          teams={teams}
+          busy={busyQueue || event.phase === 'ended'}
+          onSkip={event.phase === 'live' ? (t) => void skipTeam(t) : undefined}
+          onWithdraw={event.phase === 'live' ? (t) => void withdrawTeam(t) : undefined}
+        />
       </aside>
     </div>
   )

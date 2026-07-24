@@ -1,4 +1,4 @@
-export type TeamState = 'registered' | 'queued' | 'playing'
+export type TeamState = 'registered' | 'queued' | 'playing' | 'withdrawn'
 export type EventPhase = 'registration' | 'seeding' | 'live' | 'ended'
 
 export interface Event {
