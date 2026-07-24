@@ -65,6 +65,7 @@ export function AdminLive({ event, teams, tables, matches, onChanged }: Props) {
                     durationSeconds={match.timer_duration_seconds ?? event.timer_duration_seconds}
                     enabled
                     large
+                    pausedAt={event.phase === 'ended' ? event.closed_at : null}
                   />
                 )}
               </div>

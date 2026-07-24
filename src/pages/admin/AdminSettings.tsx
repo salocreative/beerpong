@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { supabase } from '../../lib/supabase'
 import type { Event } from '../../lib/types'
@@ -18,6 +18,14 @@ export function AdminSettings({ event, onChanged }: Props) {
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    setTimerEnabled(event.timer_enabled)
+    setDuration(event.timer_duration_seconds)
+    setStartsAt(toLocalInputValue(event.starts_at))
+    setEndsAt(toLocalInputValue(event.ends_at))
+    setName(event.name)
+  }, [event])
 
   async function save(e: FormEvent) {
     e.preventDefault()
@@ -44,18 +52,44 @@ export function AdminSettings({ event, onChanged }: Props) {
   }
 
   async function endEvent() {
-    if (!confirm('End the event and freeze the leaderboard?')) return
+    if (!confirm('End the event, pause all timers, and freeze the leaderboard?')) return
     setBusy(true)
     setError(null)
-    const { error: updateError } = await supabase
-      .from('events')
-      .update({ phase: 'ended' })
-      .eq('id', event.id)
+    setMessage(null)
+    const { error: rpcError } = await supabase.rpc('end_event', {
+      p_event_id: event.id,
+    })
     setBusy(false)
-    if (updateError) {
-      setError(updateError.message)
+    if (rpcError) {
+      setError(rpcError.message)
       return
     }
+    setMessage('Event ended. Timers paused.')
+    await onChanged()
+  }
+
+  async function resetEvent() {
+    if (
+      !confirm(
+        'Reset this event? This deletes ALL teams, matches, and queue data. Settings (name, times, timer) are kept. This cannot be undone.',
+      )
+    ) {
+      return
+    }
+    if (!confirm('Really clear everything and start fresh registration?')) return
+
+    setBusy(true)
+    setError(null)
+    setMessage(null)
+    const { error: rpcError } = await supabase.rpc('reset_event', {
+      p_event_id: event.id,
+    })
+    setBusy(false)
+    if (rpcError) {
+      setError(rpcError.message)
+      return
+    }
+    setMessage('Event reset. Registration is open again.')
     await onChanged()
   }
 
@@ -64,9 +98,10 @@ export function AdminSettings({ event, onChanged }: Props) {
       if (!confirm('Move back to registration? Live matches will not be cleared.')) return
     }
     setBusy(true)
+    setError(null)
     const { error: updateError } = await supabase
       .from('events')
-      .update({ phase: 'registration' })
+      .update({ phase: 'registration', closed_at: null })
       .eq('id', event.id)
     setBusy(false)
     if (updateError) {
@@ -168,6 +203,24 @@ export function AdminSettings({ event, onChanged }: Props) {
           className="tap-target rounded-xl border border-line px-4 py-3"
         >
           Back to registration
+        </button>
+      </div>
+
+      <div className="space-y-3 rounded-2xl border border-danger/30 bg-danger/5 p-4">
+        <div>
+          <h3 className="font-display text-2xl text-danger">Reset event</h3>
+          <p className="mt-1 text-sm text-muted">
+            Clears all teams, matches, and queue. Returns to registration so you can run a fresh
+            night. Event name and timer settings are kept.
+          </p>
+        </div>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => void resetEvent()}
+          className="tap-target w-full rounded-xl border border-danger bg-ink px-4 py-3 font-semibold text-danger disabled:opacity-40"
+        >
+          Reset & clear all teams
         </button>
       </div>
     </form>

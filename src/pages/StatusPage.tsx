@@ -88,6 +88,7 @@ export function StatusPage() {
                         startedAt={row.match.started_at}
                         durationSeconds={row.match.timer_duration_seconds ?? 600}
                         enabled
+                        pausedAt={event.phase === 'ended' ? event.closed_at : null}
                       />
                     )}
                   </div>

@@ -64,3 +64,4 @@ npm run deploy
 - Timers are visual only — they never auto-pick a winner.
 - Score = wins only. Estimated cans = `games_played * 2` (display only).
 - Match/queue transitions go through `start_tournament` and `complete_match` RPCs.
+- End night with `end_event` (pauses timers). Wipe teams/matches with `reset_event`.

@@ -54,7 +54,7 @@ export function DisplayPage() {
             {event.phase === 'live' ? 'Live' : event.phase}
           </p>
         </div>
-        <EventCountdown endsAt={event.ends_at} />
+        <EventCountdown endsAt={event.ends_at} paused={event.phase === 'ended'} />
       </header>
 
       {isEnded ? (
@@ -90,6 +90,9 @@ export function DisplayPage() {
                             startedAt={active.match.started_at}
                             durationSeconds={active.match.timer_duration_seconds ?? 600}
                             enabled
+                            pausedAt={
+                              event.phase === 'ended' ? event.closed_at : null
+                            }
                           />
                         )}
                       </div>

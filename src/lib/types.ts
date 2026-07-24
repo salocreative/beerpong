@@ -10,6 +10,7 @@ export interface Event {
   timer_enabled: boolean
   timer_duration_seconds: number
   table_count: number
+  closed_at: string | null
   created_at: string
 }
 
